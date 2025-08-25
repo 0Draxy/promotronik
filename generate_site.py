@@ -12,7 +12,7 @@ DOCS = ROOT / "docs"
 DOCS.mkdir(parents=True, exist_ok=True)
 
 # --------------------- HTTP Session ------------------------
-HEADERS = {
+BASE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
@@ -29,7 +29,7 @@ def make_session() -> requests.Session:
         s.mount("https://", HTTPAdapter(max_retries=retry))
     except Exception:
         pass
-    s.headers.update(HEADERS)
+    s.headers.update(BASE_HEADERS)
     return s
 
 SESSION = make_session()
@@ -51,7 +51,6 @@ def strip_affiliate_params(url: str, to_strip: List[str]) -> str:
     u = urllib.parse.urlsplit(url)
     q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
     for k in to_strip:
-        # strip by case-insensitive match
         for key in list(q.keys()):
             if key.lower() == k.lower():
                 q.pop(key, None)
@@ -64,7 +63,6 @@ def apply_affiliate(url: str, rules: dict) -> str:
     base = normalize_url(url)
     for key, aff in rules.items():
         if key.lower() in base.lower():
-            # ensure proper concatenation
             if aff.startswith("?"):
                 glue = "&" if "?" in base else "?"
                 return base + glue + aff.lstrip("?")
@@ -79,7 +77,9 @@ def is_merchant(host: str, merchant_domains: List[str]) -> bool:
     return False
 
 AGG_HINTS = ("dealabs.com","go.dealabs.com","frandroid.com","phonandroid.com","clubic.com")
-AFF_NET_HINTS = ("awin1.com","s.click.aliexpress.com","linksynergy","partnerize","impact.com","go.dealabs.com","adtraction","tradedoubler","effiliation")
+AFF_NET_HINTS = ("awin1.com","s.click.aliexpress.com","linksynergy","partnerize","impact.com","go.dealabs.com","adtraction","tradedoubler","effiliation","doubleclick.net")
+
+JS_REDIRECT_RE = re.compile(r"(?:location\.href|location\.assign|window\.location(?:\.href)?|document\.location)\s*=\s*['\"]([^'\"]+)['\"]", re.I)
 
 def meta_refresh_target(html: str) -> Optional[str]:
     try:
@@ -94,7 +94,6 @@ def meta_refresh_target(html: str) -> Optional[str]:
             pos = right.lower().find("url=")
             if pos >= 0:
                 raw = right[pos+4:].strip()
-                # remove surrounding quotes once
                 if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
                     raw = raw[1:-1].strip()
                 return raw
@@ -102,28 +101,86 @@ def meta_refresh_target(html: str) -> Optional[str]:
     except Exception:
         return None
 
-def http_follow(url: str, max_hops: int = 8) -> str:
+def js_redirect_target(html: str) -> Optional[str]:
+    try:
+        m = JS_REDIRECT_RE.search(html or "")
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return None
+
+def decode_affiliate_direct(url: str) -> Optional[str]:
+    # Pull direct URL from known affiliate params (AWIN, Partnerize, etc.)
+    try:
+        u = urllib.parse.urlsplit(url)
+        q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
+        for key in ("ued","u","dest","destination","dl","url","to"):
+            if key in q and q[key]:
+                return urllib.parse.unquote(q[key][0])
+    except Exception:
+        pass
+    return None
+
+def http_follow(url: str, referer: Optional[str] = None, max_hops: int = 10) -> str:
     cur = url
     try:
         for _ in range(max_hops):
-            r = SESSION.get(cur, allow_redirects=True, timeout=10)
+            headers = dict(BASE_HEADERS)
+            if referer:
+                headers["Referer"] = referer
+            r = SESSION.get(cur, allow_redirects=True, timeout=12, headers=headers)
             final = r.url
-            # try to catch meta-refresh
+            # Try affiliate direct param extraction on intermediates
+            direct_hint = decode_affiliate_direct(final)
+            if direct_hint:
+                cur = urllib.parse.urljoin(final, direct_hint)
+                referer = final
+                continue
+            # meta refresh + simple JS redirects
             ct = (r.headers.get("Content-Type") or "").lower()
             if "text/html" in ct and r.text:
-                nxt = meta_refresh_target(r.text)
+                nxt = meta_refresh_target(r.text) or js_redirect_target(r.text)
                 if nxt:
                     cur = urllib.parse.urljoin(final, nxt)
+                    referer = final
                     continue
             return final
         return cur
     except Exception:
         return cur
 
+def sanitize_merchant_url(url: str, merchant_domains: List[str]) -> str:
+    u = urllib.parse.urlsplit(url)
+    host = u.netloc.lower()
+    q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
+
+    # Generic: drop tracking/affiliate-ish keys
+    drop_prefixes = ("utm_", "fbclid", "gclid", "mc_", "pk_", "aff", "affid", "awc", "cjevent", "cmp", "cmpid", "campaign", "source", "medium")
+    drop_exact = {"awc","tt_campaign","tt_medium","tt_content","tt_source","spm","clickid","sid","pid","ad","adgroup"}
+
+    # Merchant-specific extra stripping
+    if "fnac." in host:
+        # remove awin/effiliation params seen in sample
+        for k in list(q.keys()):
+            lk = k.lower()
+            if lk.startswith("eaf-") or lk.startswith("eseg-"):
+                q.pop(k, None)
+        for k in ("origin","sv1","sv_campaign_id","awc"):
+            q.pop(k, None)
+
+    # Apply generic stripping
+    for k in list(q.keys()):
+        lk = k.lower()
+        if lk in drop_exact or any(lk.startswith(p) for p in drop_prefixes):
+            q.pop(k, None)
+
+    new_query = urllib.parse.urlencode(q, doseq=True)
+    return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, new_query, ""))
+
 def pick_first_outbound(html: str, base_url: str, merchant_domains: List[str]) -> Optional[str]:
     try:
         soup = BeautifulSoup(html, "html.parser")
-        # Known CTA selectors (Pepper/Dealabs-like)
         selectors = [
             'a[data-role="thread-buy"]',
             "a.cept-dealBtn",
@@ -136,7 +193,6 @@ def pick_first_outbound(html: str, base_url: str, merchant_domains: List[str]) -
             a = soup.select_one(sel)
             if a and a.get("href"):
                 return urllib.parse.urljoin(base_url, a["href"])
-        # Fallback: any <a> pointing to affiliate nets or merchants
         for a in soup.find_all("a", href=True):
             href = urllib.parse.urljoin(base_url, a["href"])
             host = urllib.parse.urlsplit(href).netloc.lower()
@@ -147,7 +203,6 @@ def pick_first_outbound(html: str, base_url: str, merchant_domains: List[str]) -
         return None
 
 def try_extract_from_jsonld(html: str) -> Optional[str]:
-    # Some editorial pages embed offers in JSON-LD with an "url" field.
     try:
         soup = BeautifulSoup(html, "html.parser")
         for script in soup.find_all("script", type="application/ld+json"):
@@ -155,57 +210,56 @@ def try_extract_from_jsonld(html: str) -> Optional[str]:
                 data = json.loads(script.string or "{}")
             except Exception:
                 continue
-            if isinstance(data, dict):
-                offers = data.get("offers")
+            def from_obj(obj):
+                if not isinstance(obj, dict):
+                    return None
+                offers = obj.get("offers")
                 if isinstance(offers, dict):
-                    u = offers.get("url") or (offers.get("seller", {}) or {}).get("url")
-                    if u:
-                        return u
+                    return offers.get("url") or (offers.get("seller", {}) or {}).get("url")
+                return None
+            if isinstance(data, dict):
+                u = from_obj(data)
+                if u: return u
             if isinstance(data, list):
                 for obj in data:
-                    if not isinstance(obj, dict): 
-                        continue
-                    offers = obj.get("offers")
-                    if isinstance(offers, dict):
-                        u = offers.get("url") or (offers.get("seller", {}) or {}).get("url")
-                        if u:
-                            return u
+                    u = from_obj(obj)
+                    if u: return u
         return None
     except Exception:
         return None
 
 def resolve_direct(url: str, merchant_domains: List[str]) -> str:
-    # If already merchant: follow and return
     host = urllib.parse.urlsplit(url).netloc.lower()
+    # Already merchant → follow and sanitize
     if is_merchant(host, merchant_domains):
-        return http_follow(url)
+        final = http_follow(url, referer=None)
+        return sanitize_merchant_url(final, merchant_domains)
 
-    # Otherwise fetch aggregator page and try to extract outbound link(s)
+    # Fetch aggregator/editorial
     try:
-        r = SESSION.get(url, timeout=10)
+        r = SESSION.get(url, timeout=12, headers={"Referer": url, **BASE_HEADERS})
     except Exception:
-        return http_follow(url)
+        return sanitize_merchant_url(http_follow(url), merchant_domains)
 
     candidates: List[str] = []
     if r.ok:
-        # 1) JSON-LD hint
         jurl = try_extract_from_jsonld(r.text)
         if jurl:
             candidates.append(urllib.parse.urljoin(url, jurl))
-        # 2) CTA / affiliate / merchantish link
         out = pick_first_outbound(r.text, url, merchant_domains)
         if out:
             candidates.append(out)
 
-    # Try each candidate, return first that ends on a merchant
+    # include original (go.dealabs) as fallback
+    candidates.append(url)
+
     for c in candidates:
-        final = http_follow(c)
+        final = http_follow(c, referer=url)
         h = urllib.parse.urlsplit(final).netloc.lower()
         if is_merchant(h, merchant_domains):
-            return final
+            return sanitize_merchant_url(final, merchant_domains)
 
-    # Otherwise just follow the original; it might be a redirect endpoint (e.g., go.dealabs.com)
-    return http_follow(url)
+    return sanitize_merchant_url(http_follow(url, referer=url), merchant_domains)
 
 # --------------------- Feeds & Filters ---------------------
 def parse_feed(url: str):
@@ -215,9 +269,7 @@ def parse_feed(url: str):
         link = e.get("link") or e.get("id") or ""
         title = (e.get("title") or "").strip()
         summary = (e.get("summary") or e.get("description") or "").strip()
-        # strip HTML tags crudely
         summary = re.sub("<[^>]+>", "", summary)[:300]
-        # date
         if "published_parsed" in e and e.published_parsed:
             published = dt.datetime.fromtimestamp(time.mktime(e.published_parsed), tz=dt.timezone.utc)
         elif "updated_parsed" in e and e.updated_parsed:
@@ -229,7 +281,6 @@ def parse_feed(url: str):
 
 def human_time(ts):
     if not ts: return "date inconnue"
-    # rough Paris DST
     month = dt.datetime.utcnow().month
     offset = 2 if 3 <= month <= 10 else 1
     tz = dt.timezone(dt.timedelta(hours=offset))
@@ -268,10 +319,9 @@ def main():
         try:
             for it in parse_feed(furl):
                 orig = it["link"]
-                # resolve to merchant
                 direct = resolve_direct(orig, merchant_domains)
                 link = normalize_url(direct)
-                if to_strip: 
+                if to_strip:
                     link = strip_affiliate_params(link, to_strip)
                 link = apply_affiliate(link, rules)
 
@@ -286,14 +336,13 @@ def main():
     filtered = [it for it in all_items if passes_filters(it, filters)]
     seen, unique = set(), []
     for it in sorted(filtered, key=lambda x: x.get("published") or dt.datetime(1970,1,1,tzinfo=dt.timezone.utc), reverse=True):
-        if it["norm"] in seen: 
+        if it["norm"] in seen:
             continue
         seen.add(it["norm"])
         unique.append(it)
-        if len(unique) >= items_limit: 
+        if len(unique) >= items_limit:
             break
 
-    # Render if template exists; otherwise at least data.json
     env = Environment(loader=FileSystemLoader(str(ROOT)), autoescape=select_autoescape(["html"]))
     tpl = ROOT / "template.html"
     if tpl.exists():
