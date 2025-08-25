@@ -6,38 +6,106 @@
   <meta name="description" content="{{ site.description }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {font-family: system-ui, sans-serif; margin: 24px; line-height: 1.45; color:#333; background:#fafafa;}
-    header {margin-bottom: 20px;}
-    h1 {margin: 0 0 8px; font-size: 2em; color:#222;}
-    p {margin:0 0 8px;}
-    .disc {font-size: 0.9em; color: #555; background:#f7f7f7; padding:8px 12px; border-radius:6px; margin-bottom:20px;}
-    .item {border-bottom: 1px solid #eee; padding: 12px 0;}
-    .item h3 {margin: 0 0 6px; font-size: 1.1em;}
-    .meta {font-size: 0.85em; color: #666; margin-top:4px;}
-    footer {margin-top: 32px; color:#666; font-size:0.8em;}
-    .time {white-space: nowrap;}
-    a {color:#0070f3; text-decoration:none;}
-    a:hover {text-decoration:underline;}
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #f5f7fa;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    .header {
+      background-color: #ffffff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0 0 6px;
+      font-size: 2.2em;
+      color: #0057b8;
+    }
+    .header p {
+      margin: 4px 0;
+      font-size: 1em;
+    }
+    .disc {
+      background-color: #fffbeb;
+      border-left: 4px solid #ffeb3b;
+      padding: 10px 16px;
+      margin-top: 12px;
+      margin-bottom: 0;
+      display: inline-block;
+      font-size: 0.85em;
+      color: #555;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+    .item-card {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .item-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    }
+    .item-card h3 {
+      margin: 0 0 8px;
+      font-size: 1.2em;
+    }
+    .item-card h3 a {
+      color: #0057b8;
+      text-decoration: none;
+    }
+    .item-card h3 a:hover {
+      text-decoration: underline;
+    }
+    .meta {
+      font-size: 0.85em;
+      color: #666;
+    }
+    .meta .time {
+      margin-right: 8px;
+    }
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.8em;
+      color: #888;
+    }
+    footer a {
+      color: #0057b8;
+      text-decoration: none;
+    }
+    footer a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
-  <header>
+  <div class="header">
     <h1>{{ site.title }}</h1>
     <p>{{ site.description }}</p>
     <p class="disc">{{ site.disclosure }}</p>
-  </header>
-
-  {% for it in items %}
-    <div class="item">
-      <h3><a href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">{{ it.title }}</a></h3>
-      {% if it.summary %}<div class="meta">{{ it.summary }}</div>{% endif %}
-      <div class="meta">
-        <span class="time">🕒 {{ it.published_human }}</span>
-        {% if it.source %} • <span>Source : {{ it.source }}</span>{% endif %}
+  </div>
+  <div class="container">
+    {% for it in items %}
+      <div class="item-card">
+        <h3><a href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">{{ it.title }}</a></h3>
+        {% if it.summary %}<div class="meta">{{ it.summary }}</div>{% endif %}
+        <div class="meta">
+          <span class="time">🕒 {{ it.published_human }}</span>
+          {% if it.source %} • <span>Source : {{ it.source }}</span>{% endif %}
+        </div>
       </div>
-    </div>
-  {% endfor %}
-
+    {% endfor %}
+  </div>
   <footer>
     Mis à jour automatiquement — {{ now_human }}. <a href="./mentions.html">Mentions</a>
   </footer>
