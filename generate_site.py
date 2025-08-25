@@ -7,27 +7,28 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent
 DOCS = ROOT / "docs"
-DOCS.mkdir(exist_ok=True, parents=True)
+DOCS.mkdir(parents=True, exist_ok=True)
 
 HEADERS = {"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari"}
 
-def load_yaml(path):
-    with open(path, "r", encoding="utf-8") as f:
+def load_yaml(path): 
+    with open(path, "r", encoding="utf-8") as f: 
         return yaml.safe_load(f)
 
 def normalize_url(url: str) -> str:
     u = urllib.parse.urlsplit(url)
     q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
     for k in list(q.keys()):
-        if k.lower().startswith(("utm_", "_")) or k.lower() in {"ref", "refsrc"}:
+        if k.lower().startswith(("utm_", "_")) or k.lower() in {"ref","refsrc"}:
             q.pop(k, None)
     new_q = urllib.parse.urlencode(q, doseq=True)
     return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, new_q, ""))
 
 def strip_affiliate_params(url: str, to_strip):
+    if not to_strip: return url
     u = urllib.parse.urlsplit(url)
     q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
-    for k in to_strip or []:
+    for k in to_strip:
         q.pop(k, None)
     new_q = urllib.parse.urlencode(q, doseq=True)
     return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, new_q, ""))
@@ -37,55 +38,75 @@ def apply_affiliate(url: str, rules: dict) -> str:
     base = normalize_url(url)
     for key, aff in rules.items():
         if key in base:
-            aff_to_add = "&" + aff.lstrip("?") if "?" in base and aff.startswith("?") else aff
-            return base + aff_to_add
+            add = "&" + aff.lstrip("?") if ("?" in base and aff.startswith("?")) else aff
+            return base + add
     return base
 
-# ---------- Récupération du lien marchand depuis un agrégateur ----------
-def follow_redirects(url: str, max_hops: int = 5) -> str:
+# ---------------------- Redirect & Extraction utils ----------------------
+def is_merchant_host(host: str, merchant_domains: list[str]) -> bool:
+    h = host.lower()
+    for pat in merchant_domains or []:
+        if pat.lower() in h:
+            return True
+    return False
+
+AFFILIATE_HOST_HINTS = ("awin1.com","s.click.aliexpress.com","linksynergy.com","partnerize","impact.com","go.dealabs.com")
+META_REFRESH_RE = re.compile(r'url=(.+)', re.I)
+
+def follow_chain(url: str, max_hops=10) -> str:
+    # Resolve redirects via GET (allow_redirects=True) to reach final URL.
     try:
-        cur = url
-        for _ in range(max_hops):
-            r = requests.head(cur, allow_redirects=False, headers=HEADERS, timeout=5)
-            if r.is_redirect and "Location" in r.headers:
-                cur = urllib.parse.urljoin(cur, r.headers["Location"])
-                continue
-            if r.status_code >= 400:
-                g = requests.get(cur, allow_redirects=True, headers=HEADERS, timeout=7)
-                return g.url
-            return cur
-        return cur
+        s = requests.Session()
+        r = s.get(url, headers=HEADERS, allow_redirects=True, timeout=10)
+        if "text/html" in (r.headers.get("Content-Type") or "") and r.text:
+            m = META_REFRESH_RE.search(r.text)
+            if m:
+                nxt = urllib.parse.urljoin(r.url, m.group(1).strip(' "''))
+                r2 = s.get(nxt, headers=HEADERS, allow_redirects=True, timeout=10)
+                return r2.url
+        return r.url
     except Exception:
         return url
 
-def extract_dealabs_outlink(page_url: str) -> str | None:
+def first_outbound_merchant_link(html: str, base_url: str, merchant_domains: list[str]) -> str | None:
     try:
-        r = requests.get(page_url, headers=HEADERS, timeout=7)
-        if not r.ok: return None
-        soup = BeautifulSoup(r.text, "html.parser")
-        a = soup.select_one('a[data-role="thread-buy"], a.cept-dealBtn, a[href*="go.dealabs.com"], a[href*="/visit/"]')
-        href = a.get("href") if a else None
-        if not href: return None
-        return follow_redirects(href)
+        soup = BeautifulSoup(html, "html.parser")
+        for sel in ['a[data-role="thread-buy"]','a.cept-dealBtn','a[href*="go.dealabs.com"]','a[href*="/visit/"]']:
+            a = soup.select_one(sel)
+            if a and a.get("href"):
+                return urllib.parse.urljoin(base_url, a["href"])
+        for a in soup.find_all("a", href=True):
+            href = urllib.parse.urljoin(base_url, a["href"])
+            host = urllib.parse.urlsplit(href).netloc.lower()
+            if any(h in host for h in AFFILIATE_HOST_HINTS) or is_merchant_host(host, merchant_domains):
+                return href
+        return None
     except Exception:
         return None
 
 def to_merchant(url: str, opts: dict) -> str:
-    if not opts or not opts.get("prefer_direct_merchant"):
+    if not opts or not opts.get("prefer_direct_merchant"): 
         return url
-    host = urllib.parse.urlsplit(url).netloc.lower()
+    mode = (opts.get("prefer_direct_mode") or "simple").lower()
     aggs = [d.lower() for d in (opts.get("aggregator_domains") or [])]
+    merchs = [d.lower() for d in (opts.get("merchant_domains") or [])]
     try:
-        if any(d in host for d in aggs):
-            if "go.dealabs.com" in host or "/visit/" in url:
-                return follow_redirects(url)
-            direct = extract_dealabs_outlink(url)
-            return direct or url
+        u = urllib.parse.urlsplit(url)
+        host = u.netloc.lower()
+        if is_merchant_host(host, merchs):
+            return follow_chain(url)
+        if any(d in host for d in aggs) or mode == "aggressive":
+            r = requests.get(url, headers=HEADERS, timeout=10)
+            if r.ok:
+                out = first_outbound_merchant_link(r.text, url, merchs)
+                if out:
+                    return follow_chain(out)
+            return follow_chain(url)
         return url
     except Exception:
         return url
 
-# ---------- Parsing RSS ----------
+# ---------------------- RSS parsing ----------------------
 def parse_feed(url: str):
     fp = feedparser.parse(url)
     items = []
@@ -100,19 +121,13 @@ def parse_feed(url: str):
             published = dt.datetime.fromtimestamp(time.mktime(e.updated_parsed), tz=dt.timezone.utc)
         else:
             published = None
-        items.append({
-            "title": title,
-            "link": link,
-            "summary": summary,
-            "published": published,
-            "source": urllib.parse.urlsplit(url).netloc
-        })
+        items.append({"title": title, "link": link, "summary": summary, "published": published, "source": urllib.parse.urlsplit(url).netloc})
     return items
 
 def human_time(ts):
     if not ts: return "date inconnue"
     month = dt.datetime.utcnow().month
-    offset = 2 if 3 <= month <= 10 else 1  # approx. Europe/Paris DST
+    offset = 2 if 3 <= month <= 10 else 1
     tz = dt.timezone(dt.timedelta(hours=offset))
     return ts.astimezone(tz).strftime("%Y-%m-%d %H:%M")
 
@@ -153,11 +168,10 @@ def main():
         try:
             for it in parse_feed(url):
                 orig = it["link"]
-                direct = to_merchant(orig, opts)      # lien direct marchand si possible
+                direct = to_merchant(orig, opts)
                 link = normalize_url(direct)
-                if to_strip:
-                    link = strip_affiliate_params(link, to_strip)
-                link = apply_affiliate(link, rules)   # tes paramètres d'affiliation
+                if to_strip: link = strip_affiliate_params(link, to_strip)
+                link = apply_affiliate(link, rules)
                 it["link"] = link
                 it["norm"] = normalize_url(link)
                 all_items.append(it)
@@ -174,10 +188,10 @@ def main():
         if len(unique) >= limit: break
 
     env = Environment(loader=FileSystemLoader(str(ROOT)), autoescape=select_autoescape(["html"]))
-    tpl = env.get_template("template.html") if (ROOT / "template.html").exists() else None
-    if tpl:
-        html = tpl.render(items=unique, site=site, now_human=human_time(dt.datetime.now(dt.timezone.utc)))
-        (DOCS / "index.html").write_text(html, encoding="utf-8")
+    tpl = ROOT / "template.html"
+    if tpl.exists():
+        page = env.get_template("template.html").render(items=unique, site=site, now_human=human_time(dt.datetime.now(dt.timezone.utc)))
+        (DOCS / "index.html").write_text(page, encoding="utf-8")
     (DOCS / "data.json").write_text(json.dumps(unique, default=str, ensure_ascii=False, indent=2), encoding="utf-8")
     copy_assets()
     print(f"[ok] {len(unique)} items -> docs/index.html / data.json")

@@ -3,28 +3,25 @@ feeds:
   - url: https://www.dealabs.com/rss/nouveaux
   - url: https://www.frandroid.com/bon-plans/feed
   - url: https://www.clubic.com/rss/
+  - url: https://www.phonandroid.com/feed
 
-# Règles d'affiliation (exemple). Remplace TONID-21 par ton tag Amazon.
 affiliate_rules:
   "amazon.fr": "?tag=TONID-21"
-  "amazon.es": "?tag=TONID-21"
   "amazon.de": "?tag=TONID-21"
+  "amazon.es": "?tag=TONID-21"
   "amazon.it": "?tag=TONID-21"
 
-# Filtres (adapte si besoin)
 filters:
   include_keywords: []
-  exclude_keywords: ["assurance", "crédit", "casino", "paris sportifs", "cigarette"]
+  exclude_keywords: ["assurance","crédit","casino","paris sportifs","cigarette"]
 
-# Options "lien direct marchand"
 options:
   prefer_direct_merchant: true
+  prefer_direct_mode: "aggressive"
   strip_affiliate_params: true
-  # Domaines d'agrégateurs à dérouler (tu peux en ajouter)
-  aggregator_domains: ["dealabs.com", "go.dealabs.com"]
-  # Paramètres d'affiliation à supprimer AVANT d'ajouter les tiens
-  affiliate_params_to_strip: ["tag","ascsubtag","affid","aff","awc","utm_source","utm_medium","utm_campaign","amdata","_encoding","linkCode"]
-
+  aggregator_domains: ["dealabs.com","go.dealabs.com","frandroid.com","phonandroid.com","clubic.com"]
+  merchant_domains: ["amazon.","aliexpress.","cdiscount.","manomano.","ldlc.","boulanger.","fnac.","darty.","rakuten.","decathlon.","rueducommerce."]
+  affiliate_params_to_strip: ["tag","ascsubtag","affid","aff","awc","utm_source","utm_medium","utm_campaign","utm_term","utm_content","amdata","_encoding","linkCode","camp","campid","cjevent","awinaffid","awinmid","fbclid","mc_eid","mc_cid"]
 site:
   title: "PromoTronik"
   description: "Bons plans High‑Tech & DIY — liens directs marchands (affiliation)"
