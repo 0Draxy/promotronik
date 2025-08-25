@@ -1,4 +1,4 @@
-import os, json, yaml
+import os, json, yaml, sys
 from pathlib import Path
 from datetime import datetime, timezone
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -14,10 +14,13 @@ DOCS.mkdir(parents=True, exist_ok=True)
 def load_config():
     return yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
 
-def collect_amazon(cfg):
+def collect_amazon(cfg, debug_lines):
     ac = cfg.get("amazon", {}) or {}
-    if not ac.get("enabled"): 
+    if not ac.get("enabled"):
+        debug_lines.append("[amazon] disabled in config.yaml")
         return []
+    present = {k: bool(os.getenv(k)) for k in ("AMAZON_ACCESS_KEY","AMAZON_SECRET_KEY","AMAZON_PARTNER_TAG")}
+    debug_lines.append(f"[amazon] env present: {present}")
     items = fetch_amazon_items(
         marketplace=ac.get("marketplace") or "www.amazon.fr",
         partner_tag=ac.get("partner_tag"),
@@ -26,25 +29,31 @@ def collect_amazon(cfg):
     tag = ac.get("partner_tag") or os.getenv("AMAZON_PARTNER_TAG")
     for it in items:
         it.url = ensure_amazon_tag(it.url, tag)
+    debug_lines.append(f"[amazon] collected: {len(items)} items")
     return items
 
-def collect_awin(cfg):
+def collect_awin(cfg, debug_lines):
     aw = cfg.get("awin", {}) or {}
     if not aw.get("enabled"):
+        debug_lines.append("[awin] disabled in config.yaml")
         return []
     out = []
     for feed in aw.get("feeds") or []:
-        if not feed.get("enabled"): 
+        if not feed.get("enabled"):
+            debug_lines.append(f"[awin] {feed.get('name')} disabled")
             continue
         env_name = feed.get("env")
         url = os.getenv(env_name, "")
         if not url:
-            print(f"[awin] {feed.get('name')} → no URL in env {env_name}, skipped")
+            debug_lines.append(f"[awin] {feed.get('name')}: no URL in env {env_name}")
             continue
         out.extend(fetch_awin_feed(url, feed.get("name")))
+        debug_lines.append(f"[awin] {feed.get('name')}: total so far {len(out)}")
     min_disc = float(aw.get("min_discount_percent") or 0)
     if min_disc:
+        before = len(out)
         out = [it for it in out if it.old_price and it.price and it.old_price > it.price and (it.old_price - it.price)/it.old_price*100.0 >= min_disc]
+        debug_lines.append(f"[awin] discount filter {min_disc}%: {before} -> {len(out)}")
     return out
 
 def rank_items(items, cfg):
@@ -69,28 +78,33 @@ def rank_items(items, cfg):
 
     return sorted(items, key=score, reverse=True)
 
-def render(items, cfg):
+def render(items, cfg, debug_lines):
     env = Environment(loader=FileSystemLoader(str(ROOT / "templates")), autoescape=select_autoescape(["html"]))
     now = datetime.now(timezone.utc)
     page = env.get_template("index.html").render(
         items=[it.to_dict() for it in items],
         site=cfg.get("site"),
-        updated_at=now.isoformat()
+        updated_at=now.isoformat(),
+        empty_state=(len(items) == 0)
     )
     (DOCS / "index.html").write_text(page, encoding="utf-8")
     (DOCS / "data.json").write_text(json.dumps([it.to_dict() for it in items], ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[ok] {len(items)} items → docs/")
+    (DOCS / "debug.txt").write_text("\n".join(debug_lines), encoding="utf-8")
+    print(f"[ok] {len(items)} items → docs/ (see docs/debug.txt)")
 
 def main():
+    debug_lines = []
     cfg = load_config()
     items = []
-    items += collect_amazon(cfg)
-    items += collect_awin(cfg)
+    items += collect_amazon(cfg, debug_lines)
+    items += collect_awin(cfg, debug_lines)
+    debug_lines.append(f"[collect] total before dedupe: {len(items)}")
     items = dedupe(items)
+    debug_lines.append(f"[collect] after dedupe: {len(items)}")
     items = rank_items(items, cfg)
     limit = int(cfg.get("site", {}).get("items_limit", 120))
     items = items[:limit]
-    render(items, cfg)
+    render(items, cfg, debug_lines)
 
 if __name__ == "__main__":
     main()
