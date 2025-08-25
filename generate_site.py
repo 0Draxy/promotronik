@@ -11,15 +11,15 @@ DOCS.mkdir(parents=True, exist_ok=True)
 
 HEADERS = {"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari"}
 
-def load_yaml(path): 
-    with open(path, "r", encoding="utf-8") as f: 
+def load_yaml(path):
+    with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 def normalize_url(url: str) -> str:
     u = urllib.parse.urlsplit(url)
     q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
     for k in list(q.keys()):
-        if k.lower().startswith(("utm_", "_")) or k.lower() in {"ref","refsrc"}:
+        if k.lower().startswith(("utm_", "_")) or k.lower() in {"ref", "refsrc"}:
             q.pop(k, None)
     new_q = urllib.parse.urlencode(q, doseq=True)
     return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, new_q, ""))
@@ -42,7 +42,6 @@ def apply_affiliate(url: str, rules: dict) -> str:
             return base + add
     return base
 
-# ---------------------- Redirect & Extraction utils ----------------------
 def is_merchant_host(host: str, merchant_domains: list[str]) -> bool:
     h = host.lower()
     for pat in merchant_domains or []:
@@ -50,27 +49,44 @@ def is_merchant_host(host: str, merchant_domains: list[str]) -> bool:
             return True
     return False
 
-AFFILIATE_HOST_HINTS = ("awin1.com","s.click.aliexpress.com","linksynergy.com","partnerize","impact.com","go.dealabs.com")
-META_REFRESH_RE = re.compile(r'url=(.+)', re.I)
+AFFILIATE_HOST_HINTS = (
+    "awin1.com","s.click.aliexpress.com","linksynergy.com",
+    "partnerize","impact.com","go.dealabs.com","track","r.mradx"
+)
 
-def _clean_meta_url(text: str) -> str:
-    text = text.strip()
-    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
-        return text[1:-1].strip()
-    return re.sub(r'^\s*['"]?(.*?)['"]?\s*$', r'\1', text)
+def _extract_meta_refresh_target(html: str) -> str | None:
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        tag = soup.find("meta", attrs={"http-equiv": lambda x: x and x.lower() == "refresh"})
+        if not tag: return None
+        content = tag.get("content") or ""
+        parts = content.split(";", 1)
+        if len(parts) == 2 and "url=" in parts[1].lower():
+            after = parts[1]
+            pos = after.lower().find("url=")
+            raw = after[pos+4:]
+            t = raw.strip()
+            if (t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'")):
+                t = t[1:-1].strip()
+            return t
+        return None
+    except Exception:
+        return None
 
-def follow_chain(url: str, max_hops=10) -> str:
+def follow_chain(url: str, max_hops: int = 8) -> str:
     try:
         s = requests.Session()
-        r = s.get(url, headers=HEADERS, allow_redirects=True, timeout=10)
-        if "text/html" in (r.headers.get("Content-Type") or "") and r.text:
-            m = META_REFRESH_RE.search(r.text)
-            if m:
-                raw = _clean_meta_url(m.group(1))
-                nxt = urllib.parse.urljoin(r.url, raw)
-                r2 = s.get(nxt, headers=HEADERS, allow_redirects=True, timeout=10)
-                return r2.url
-        return r.url
+        cur = url
+        for _ in range(max_hops):
+            r = s.get(cur, headers=HEADERS, allow_redirects=True, timeout=10)
+            final = r.url
+            if "text/html" in (r.headers.get("Content-Type") or "").lower():
+                nxt = _extract_meta_refresh_target(r.text) or ""
+                if nxt:
+                    cur = urllib.parse.urljoin(final, nxt)
+                    continue
+            return final
+        return cur
     except Exception:
         return url
 
@@ -91,7 +107,7 @@ def first_outbound_merchant_link(html: str, base_url: str, merchant_domains: lis
         return None
 
 def to_merchant(url: str, opts: dict) -> str:
-    if not opts or not opts.get("prefer_direct_merchant"): 
+    if not opts or not opts.get("prefer_direct_merchant"):
         return url
     mode = (opts.get("prefer_direct_mode") or "simple").lower()
     aggs = [d.lower() for d in (opts.get("aggregator_domains") or [])]
@@ -112,7 +128,6 @@ def to_merchant(url: str, opts: dict) -> str:
     except Exception:
         return url
 
-# ---------------------- RSS parsing ----------------------
 def parse_feed(url: str):
     fp = feedparser.parse(url)
     items = []
@@ -127,7 +142,13 @@ def parse_feed(url: str):
             published = dt.datetime.fromtimestamp(time.mktime(e.updated_parsed), tz=dt.timezone.utc)
         else:
             published = None
-        items.append({"title": title, "link": link, "summary": summary, "published": published, "source": urllib.parse.urlsplit(url).netloc})
+        items.append({
+            "title": title,
+            "link": link,
+            "summary": summary,
+            "published": published,
+            "source": urllib.parse.urlsplit(url).netloc
+        })
     return items
 
 def human_time(ts):
@@ -180,6 +201,7 @@ def main():
                 link = apply_affiliate(link, rules)
                 it["link"] = link
                 it["norm"] = normalize_url(link)
+                it["published_human"] = human_time(it.get("published"))
                 all_items.append(it)
         except Exception as ex:
             print(f"[warn] feed error {url}: {ex}")
@@ -189,7 +211,6 @@ def main():
     for it in sorted(filtered, key=lambda x: x.get("published") or dt.datetime(1970,1,1,tzinfo=dt.timezone.utc), reverse=True):
         if it["norm"] in seen: continue
         seen.add(it["norm"])
-        it["published_human"] = human_time(it.get("published"))
         unique.append(it)
         if len(unique) >= limit: break
 
