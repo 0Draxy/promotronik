@@ -9,14 +9,13 @@ amazon:
   enabled: true
   marketplace: "www.amazon.fr"
   partner_tag: null
-  partner_type: "Associates"
   queries:
-    - { keywords: "SSD NVMe", browse_node: null, sort_by: "SalesRank", min_savings_percent: 10 }
-    - { keywords: "Casque Bluetooth", browse_node: null, sort_by: "SalesRank", min_savings_percent: 10 }
-    - { keywords: "Perceuse", browse_node: null, sort_by: "SalesRank", min_savings_percent: 10 }
+    - { keywords: "SSD NVMe", sort_by: "SalesRank", min_savings_percent: 10 }
+    - { keywords: "Casque Bluetooth", sort_by: "SalesRank", min_savings_percent: 10 }
+    - { keywords: "Perceuse", sort_by: "SalesRank", min_savings_percent: 10 }
 
 awin:
-  enabled: true
+  enabled: false
   feeds:
     - { name: "fnac",   env: "AWIN_FEED_FNAC",   enabled: true }
     - { name: "darty",  env: "AWIN_FEED_DARTY",  enabled: true }
