@@ -7,7 +7,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent
 DOCS = ROOT / "docs"
-DOCS.mkdir(parents=True, exist_ok=True)
+DOCS.mkdir(exist_ok=True, parents=True)
 
 HEADERS = {"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari"}
 
@@ -199,6 +199,7 @@ def main():
                 link = normalize_url(direct)
                 if to_strip: link = strip_affiliate_params(link, to_strip)
                 link = apply_affiliate(link, rules)
+                it["origin"] = orig
                 it["link"] = link
                 it["norm"] = normalize_url(link)
                 it["published_human"] = human_time(it.get("published"))
@@ -215,10 +216,8 @@ def main():
         if len(unique) >= limit: break
 
     env = Environment(loader=FileSystemLoader(str(ROOT)), autoescape=select_autoescape(["html"]))
-    tpl = ROOT / "template.html"
-    if tpl.exists():
-        page = env.get_template("template.html").render(items=unique, site=site, now_human=human_time(dt.datetime.now(dt.timezone.utc)))
-        (DOCS / "index.html").write_text(page, encoding="utf-8")
+    page = env.get_template("template.html").render(items=unique, site=site, now_human=human_time(dt.datetime.now(dt.timezone.utc)))
+    (DOCS / "index.html").write_text(page, encoding="utf-8")
     (DOCS / "data.json").write_text(json.dumps(unique, default=str, ensure_ascii=False, indent=2), encoding="utf-8")
     copy_assets()
     print(f"[ok] {len(unique)} items -> docs/index.html / data.json")
