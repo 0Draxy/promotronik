@@ -1,4 +1,4 @@
-import json, time, re, urllib.parse, datetime as dt, requests
+import json, time, re, urllib.parse, datetime as dt, requests, contextlib
 from pathlib import Path
 from typing import List, Optional
 import feedparser
@@ -71,14 +71,9 @@ def apply_affiliate(url: str, rules: dict) -> str:
 
 def is_merchant(host: str, merchant_domains: List[str]) -> bool:
     h = host.lower()
-    for pat in merchant_domains or []:
-        if pat.lower() in h:
-            return True
-    return False
+    return any(pat.lower() in h for pat in (merchant_domains or []))
 
-AGG_HINTS = ("dealabs.com","go.dealabs.com","frandroid.com","phonandroid.com","clubic.com")
 AFF_NET_HINTS = ("awin1.com","s.click.aliexpress.com","linksynergy","partnerize","impact.com","go.dealabs.com","adtraction","tradedoubler","effiliation","doubleclick.net")
-
 JS_REDIRECT_RE = re.compile(r"(?:location\.href|location\.assign|window\.location(?:\.href)?|document\.location)\s*=\s*['\"]([^'\"]+)['\"]", re.I)
 
 def meta_refresh_target(html: str) -> Optional[str]:
@@ -111,7 +106,6 @@ def js_redirect_target(html: str) -> Optional[str]:
     return None
 
 def decode_affiliate_direct(url: str) -> Optional[str]:
-    # Pull direct URL from known affiliate params (AWIN, Partnerize, etc.)
     try:
         u = urllib.parse.urlsplit(url)
         q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
@@ -131,13 +125,11 @@ def http_follow(url: str, referer: Optional[str] = None, max_hops: int = 10) -> 
                 headers["Referer"] = referer
             r = SESSION.get(cur, allow_redirects=True, timeout=12, headers=headers)
             final = r.url
-            # Try affiliate direct param extraction on intermediates
             direct_hint = decode_affiliate_direct(final)
             if direct_hint:
                 cur = urllib.parse.urljoin(final, direct_hint)
                 referer = final
                 continue
-            # meta refresh + simple JS redirects
             ct = (r.headers.get("Content-Type") or "").lower()
             if "text/html" in ct and r.text:
                 nxt = meta_refresh_target(r.text) or js_redirect_target(r.text)
@@ -154,30 +146,75 @@ def sanitize_merchant_url(url: str, merchant_domains: List[str]) -> str:
     u = urllib.parse.urlsplit(url)
     host = u.netloc.lower()
     q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
-
-    # Generic: drop tracking/affiliate-ish keys
     drop_prefixes = ("utm_", "fbclid", "gclid", "mc_", "pk_", "aff", "affid", "awc", "cjevent", "cmp", "cmpid", "campaign", "source", "medium")
     drop_exact = {"awc","tt_campaign","tt_medium","tt_content","tt_source","spm","clickid","sid","pid","ad","adgroup"}
-
-    # Merchant-specific extra stripping
     if "fnac." in host:
-        # remove awin/effiliation params seen in sample
         for k in list(q.keys()):
             lk = k.lower()
             if lk.startswith("eaf-") or lk.startswith("eseg-"):
                 q.pop(k, None)
         for k in ("origin","sv1","sv_campaign_id","awc"):
             q.pop(k, None)
-
-    # Apply generic stripping
     for k in list(q.keys()):
         lk = k.lower()
         if lk in drop_exact or any(lk.startswith(p) for p in drop_prefixes):
             q.pop(k, None)
-
     new_query = urllib.parse.urlencode(q, doseq=True)
     return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, new_query, ""))
 
+# --------------------- Browser fallback (Playwright) ---------------------
+def resolve_with_browser(url: str, merchant_domains: List[str]) -> Optional[str]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        return None  # Playwright not installed
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(user_agent=BASE_HEADERS["User-Agent"])
+            page = ctx.new_page()
+
+            target_url: Optional[str] = None
+
+            def on_request(request):
+                nonlocal target_url
+                host = urllib.parse.urlsplit(request.url).netloc.lower()
+                if target_url is None and any(d in host for d in merchant_domains):
+                    target_url = request.url
+
+            page.on("request", on_request)
+            page.goto(url, wait_until="domcontentloaded", timeout=25000)
+
+            # Try to click common CTA selectors
+            selectors = [
+                'a[data-role="thread-buy"]',
+                "a.cept-dealBtn",
+                'a[href*="/visit/"]',
+                'a[href*="go.dealabs.com"]',
+                'a[rel~="sponsored"]',
+            ]
+            for sel in selectors:
+                with contextlib.suppress(Exception):
+                    if page.query_selector(sel):
+                        page.click(sel, timeout=5000)
+                        page.wait_for_load_state("networkidle", timeout=25000)
+                        break
+
+            with contextlib.suppress(Exception):
+                page.wait_for_load_state("networkidle", timeout=8000)
+
+            final = target_url or page.url
+            browser.close()
+
+            h = urllib.parse.urlsplit(final).netloc.lower()
+            if any(d in h for d in merchant_domains):
+                return sanitize_merchant_url(final, merchant_domains)
+            return None
+    except Exception:
+        return None
+
+# --------------------- Extraction helpers ---------------------
 def pick_first_outbound(html: str, base_url: str, merchant_domains: List[str]) -> Optional[str]:
     try:
         soup = BeautifulSoup(html, "html.parser")
@@ -196,7 +233,7 @@ def pick_first_outbound(html: str, base_url: str, merchant_domains: List[str]) -
         for a in soup.find_all("a", href=True):
             href = urllib.parse.urljoin(base_url, a["href"])
             host = urllib.parse.urlsplit(href).netloc.lower()
-            if any(h in host for h in AFF_NET_HINTS) or is_merchant(host, merchant_domains):
+            if any(h in host for h in AFF_NET_HINTS) or any(d in host for d in merchant_domains):
                 return href
         return None
     except Exception:
@@ -230,12 +267,11 @@ def try_extract_from_jsonld(html: str) -> Optional[str]:
 
 def resolve_direct(url: str, merchant_domains: List[str]) -> str:
     host = urllib.parse.urlsplit(url).netloc.lower()
-    # Already merchant → follow and sanitize
-    if is_merchant(host, merchant_domains):
+    if any(d in host for d in merchant_domains):
         final = http_follow(url, referer=None)
         return sanitize_merchant_url(final, merchant_domains)
 
-    # Fetch aggregator/editorial
+    # Try fast HTTP path
     try:
         r = SESSION.get(url, timeout=12, headers={"Referer": url, **BASE_HEADERS})
     except Exception:
@@ -250,15 +286,22 @@ def resolve_direct(url: str, merchant_domains: List[str]) -> str:
         if out:
             candidates.append(out)
 
-    # include original (go.dealabs) as fallback
+    # include original as fallback
     candidates.append(url)
 
+    # 1) Try HTTP follows
     for c in candidates:
         final = http_follow(c, referer=url)
         h = urllib.parse.urlsplit(final).netloc.lower()
-        if is_merchant(h, merchant_domains):
+        if any(d in h for d in merchant_domains):
             return sanitize_merchant_url(final, merchant_domains)
 
+    # 2) If still no merchant, try the headless browser once
+    browser_final = resolve_with_browser(url, merchant_domains)
+    if browser_final:
+        return browser_final
+
+    # 3) Last resort: whatever HTTP ended on (sanitized)
     return sanitize_merchant_url(http_follow(url, referer=url), merchant_domains)
 
 # --------------------- Feeds & Filters ---------------------

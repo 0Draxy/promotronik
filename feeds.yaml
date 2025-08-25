@@ -16,7 +16,6 @@ filters:
   exclude_keywords: ["assurance","crédit","casino","paris sportifs","cigarette"]
 
 options:
-  prefer_direct_merchant: true
   strip_affiliate_params: true
   merchant_domains: ["amazon.", "aliexpress.", "cdiscount.", "manomano.", "ldlc.", "boulanger.", "fnac.", "darty.", "rakuten.", "decathlon.", "rueducommerce.", "ikea.", "leroymerlin.", "castorama."]
   affiliate_params_to_strip: ["tag","ascsubtag","affid","aff","awc","utm_source","utm_medium","utm_campaign","utm_term","utm_content","amdata","_encoding","linkCode","camp","campid","cjevent","awinaffid","awinmid","fbclid","mc_eid","mc_cid"]
@@ -25,4 +24,4 @@ site:
   title: "PromoTronik"
   description: "Bons plans High‑Tech & DIY — liens directs marchands (affiliation)"
   disclosure: "Contient des liens affiliés. En tant que Partenaire Amazon, je réalise un bénéfice sur les achats remplissant les conditions requises."
-  items_limit: 100
+  items_limit: 80
