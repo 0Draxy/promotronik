@@ -1,1 +1,45 @@
-<!doctype html><html><body><h1>{{ site.title }}</h1>{% for it in items %}<p><a href='{{ it.link }}' target='_blank'>{{ it.title }}</a> — {{ it.published_human }}</p>{% endfor %}<p>{{ now_human }}</p><p><a href='./mentions.html'>Mentions</a></p></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{{ site.title }}</title>
+  <meta name="description" content="{{ site.description }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {font-family: system-ui, sans-serif; margin: 24px; line-height: 1.45; color:#333; background:#fafafa;}
+    header {margin-bottom: 20px;}
+    h1 {margin: 0 0 8px; font-size: 2em; color:#222;}
+    p {margin:0 0 8px;}
+    .disc {font-size: 0.9em; color: #555; background:#f7f7f7; padding:8px 12px; border-radius:6px; margin-bottom:20px;}
+    .item {border-bottom: 1px solid #eee; padding: 12px 0;}
+    .item h3 {margin: 0 0 6px; font-size: 1.1em;}
+    .meta {font-size: 0.85em; color: #666; margin-top:4px;}
+    footer {margin-top: 32px; color:#666; font-size:0.8em;}
+    .time {white-space: nowrap;}
+    a {color:#0070f3; text-decoration:none;}
+    a:hover {text-decoration:underline;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{ site.title }}</h1>
+    <p>{{ site.description }}</p>
+    <p class="disc">{{ site.disclosure }}</p>
+  </header>
+
+  {% for it in items %}
+    <div class="item">
+      <h3><a href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">{{ it.title }}</a></h3>
+      {% if it.summary %}<div class="meta">{{ it.summary }}</div>{% endif %}
+      <div class="meta">
+        <span class="time">🕒 {{ it.published_human }}</span>
+        {% if it.source %} • <span>Source : {{ it.source }}</span>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+
+  <footer>
+    Mis à jour automatiquement — {{ now_human }}. <a href="./mentions.html">Mentions</a>
+  </footer>
+</body>
+</html>

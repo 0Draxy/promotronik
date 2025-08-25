@@ -1,16 +1,24 @@
+# Configuration du site PromoTronik
+
 feeds:
   - url: https://www.dealabs.com/rss/hot
   - url: https://www.dealabs.com/rss/nouveaux
   - url: https://www.frandroid.com/bon-plans/feed
   - url: https://www.clubic.com/rss/
   - url: https://www.phonandroid.com/feed
-filters:
-  include_keywords: [perceuse, tournevis, fer à souder, microcontrôleur, arduino, raspberry, SSD, outil, promo, bon plan, réduction]
-  exclude_keywords: [assurance, crédit, casino, paris sportifs, cigarette]
+
 affiliate_rules:
   "amazon.fr": "?tag=TONTAG-21"
+  "amazon.com": "?tag=YOURTAG-20"
+  "aliexpress.com": "?aff_fcid=TON_ID"
+
 site:
   title: "PromoTronik"
-  description: "Bons plans High‑Tech & DIY — page auto‑mise à jour (affiliation)"
+  description: "Sélection auto-mise à jour de promos et bons plans high-tech & DIY"
   disclosure: "Contient des liens affiliés. En tant que Partenaire Amazon, je réalise un bénéfice sur les achats remplissant les conditions requises."
   items_limit: 100
+
+# Filtres pour inclure ou exclure des mots-clés (tout en minuscules)
+filters:
+  include_keywords: []   # ex: ["perceuse", "arduino"]
+  exclude_keywords: []   # ex: ["réfrigérateur", "voiture"]
