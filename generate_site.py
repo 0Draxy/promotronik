@@ -61,7 +61,7 @@ def follow_chain(url: str, max_hops=10) -> str:
         if "text/html" in (r.headers.get("Content-Type") or "") and r.text:
             m = META_REFRESH_RE.search(r.text)
             if m:
-                nxt = urllib.parse.urljoin(r.url, m.group(1).strip(" '""))
+                nxt = urllib.parse.urljoin(r.url, m.group(1).strip(" '\\""))
                 r2 = s.get(nxt, headers=HEADERS, allow_redirects=True, timeout=10)
                 return r2.url
         return r.url
