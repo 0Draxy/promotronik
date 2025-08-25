@@ -26,6 +26,7 @@
           <select id="sort">
             <option value="new">Plus récentes</option>
             <option value="az">A → Z</option>
+            <option value="price">Prix ↑</option>
           </select>
           <button class="mode" id="modeToggle" aria-label="Basculer thème">🌙</button>
         </div>
@@ -33,29 +34,27 @@
       <div class="disclosure">{{ site.disclosure }}</div>
     </div>
   </header>
+
   <main class="wrap">
-    <div id="chips" class="chips">
-      <button data-k="ssd">SSD</button>
-      <button data-k="perceuse">Bricolage</button>
-      <button data-k="raspberry">Raspberry/Arduino</button>
-      <button data-k="ugreen">UGREEN</button>
-      <button data-k="camping">Camping/outdoor</button>
-      <button data-k="sport">Sport</button>
-      <button data-k="">Tout</button>
-    </div>
-    <!-- SSR fallback if JS disabled -->
+    <div id="chips" class="chips"></div>
+
     <div id="cards" class="cards">
       {% for it in items %}
         <article class="card">
+          {% if it.image %}<div class="thumb" style="background-image:url('{{ it.image }}')"></div>{% endif %}
           <div class="card-body">
-            <div class="card-title">
-              <img class="favicon" src="https://www.google.com/s2/favicons?domain={{ it.source }}&sz=32" alt="" width="16" height="16">
-              <h3><a href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">{{ it.title }}</a></h3>
+            <div class="row">
+              <div class="card-title">
+                <img class="favicon" src="https://www.google.com/s2/favicons?domain={{ it.source }}&sz=32" alt="" width="16" height="16">
+                <h3><a href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">{{ it.title }}</a></h3>
+              </div>
+              <button class="fav" data-href="{{ it.link }}" title="Ajouter aux favoris">♡</button>
             </div>
             {% if it.summary %}<p class="summary">{{ it.summary }}</p>{% endif %}
             <div class="meta">
               <span class="time">🕒 {{ it.published_human }}</span>
               {% if it.source %}<span class="dot">•</span><span class="src">{{ it.source }}</span>{% endif %}
+              {% if it.price %}<span class="badge price">{{ it.price }}{% if it.currency %} {{ it.currency }}{% endif %}</span>{% endif %}
               <a class="cta" href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">Voir l’offre →</a>
             </div>
           </div>
@@ -63,12 +62,13 @@
       {% endfor %}
     </div>
   </main>
+
   <footer class="foot">
     <div class="wrap">
       <p>Mis à jour automatiquement — {{ now_human }} • <a href="./data.json">Flux JSON</a> • <a href="./mentions.html">Mentions</a></p>
     </div>
   </footer>
-  <script>window.__PROMO__NOW="{{ now_human }}";</script>
+
   <script src="./assets/app.js" defer></script>
 </body>
 </html>

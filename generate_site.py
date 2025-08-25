@@ -1,116 +1,165 @@
-import os, re, json, time, urllib.parse, datetime as dt, shutil
+import os, re, json, time, urllib.parse, datetime as dt, shutil, requests
 from pathlib import Path
 import feedparser
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from slugify import slugify
+from bs4 import BeautifulSoup
 import yaml
 
 ROOT = Path(__file__).resolve().parent
 DOCS = ROOT / "docs"
 DOCS.mkdir(exist_ok=True, parents=True)
 
+HEADERS = {'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36'}
+
 def copy_assets():
-  src = ROOT / "assets"
-  dst = DOCS / "assets"
-  if src.exists():
-    shutil.rmtree(dst, ignore_errors=True)
-    shutil.copytree(src, dst)
+    src = ROOT / "assets"; dst = DOCS / "assets"
+    if src.exists():
+        shutil.rmtree(dst, ignore_errors=True); shutil.copytree(src, dst)
 
 def load_yaml(path):
-  with open(path, "r", encoding="utf-8") as f:
-    return yaml.safe_load(f)
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+price_re = re.compile(r'(\d+[\s\u00A0]?(?:[\.,]\d{2})?)\s*(€|eur|euro|euros)', re.I)
+
+def extract_price(text):
+    if not text: return None, None, None
+    m = price_re.search(text)
+    if not m: return None, None, None
+    raw = m.group(1).replace('\u00A0',' ').replace(' ', '').replace(',', '.')
+    try: val = float(raw)
+    except: val = None
+    cur = '€'
+    return m.group(1).replace('\u00A0',' '), cur, val
 
 def normalize_url(url: str) -> str:
-  u = urllib.parse.urlsplit(url)
-  q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
-  for k in list(q.keys()):
-    if k.lower().startswith(("_", "utm_")) or k.lower() in {"ref","refsrc"}:
-      q.pop(k, None)
-  new_q = urllib.parse.urlencode(q, doseq=True)
-  return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, new_q, ""))
+    u = urllib.parse.urlsplit(url)
+    q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
+    for k in list(q.keys()):
+        if k.lower().startswith(("_", "utm_")) or k.lower() in {"ref", "refsrc"}:
+            q.pop(k, None)
+    new_q = urllib.parse.urlencode(q, doseq=True)
+    return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, new_q, ""))
 
 def apply_affiliate(url: str, rules: dict) -> str:
-  if not rules: return url
-  base = normalize_url(url)
-  for key, aff in rules.items():
-    if key in base:
-      aff_to_add = "&" + aff.lstrip("?") if "?" in aff and urllib.parse.urlsplit(base).query else aff
-      return base + aff_to_add
-  return base
+    if not rules: return url
+    base = normalize_url(url)
+    for key, aff in rules.items():
+        if key in base:
+            aff_to_add = "&" + aff.lstrip("?") if "?" in aff and urllib.parse.urlsplit(base).query else aff
+            return base + aff_to_add
+    return base
+
+def find_image_from_entry(e):
+    for key in ("media_thumbnail","media_content"):
+        if key in e and e[key]:
+            try:
+                return e[key][0].get("url")
+            except Exception: pass
+    if "links" in e:
+        for L in e.links:
+            if L.get("rel") == "enclosure" and "image" in (L.get("type") or ""):
+                return L.get("href")
+    return None
+
+def fetch_og_image(url):
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=4)
+        if r.ok:
+            soup = BeautifulSoup(r.text, "html.parser")
+            tag = soup.find("meta", property="og:image") or soup.find("meta", attrs={"name":"twitter:image"})
+            if tag and tag.get("content"): return tag["content"]
+    except Exception: pass
+    return None
 
 def parse_feed(url: str):
-  fp = feedparser.parse(url)
-  items = []
-  for e in fp.entries:
-    link = e.get("link") or e.get("id") or ""
-    title = (e.get("title") or "").strip()
-    summary = (e.get("summary") or e.get("description") or "").strip()
-    summary = re.sub(r"<[^>]+>", "", summary)[:280]
-    if "published_parsed" in e and e.published_parsed:
-      published = dt.datetime.fromtimestamp(time.mktime(e.published_parsed), tz=dt.timezone.utc)
-    elif "updated_parsed" in e and e.updated_parsed:
-      published = dt.datetime.fromtimestamp(time.mktime(e.updated_parsed), tz=dt.timezone.utc)
-    else:
-      published = None
-    items.append({"title": title, "link": link, "summary": summary, "published": published, "source": urllib.parse.urlsplit(url).netloc})
-  return items
+    fp = feedparser.parse(url)
+    items = []
+    for e in fp.entries:
+        link = e.get("link") or e.get("id") or ""
+        title = (e.get("title") or "").strip()
+        summary = (e.get("summary") or e.get("description") or "").strip()
+        summary_txt = re.sub(r"<[^>]+>", "", summary)
+        price_txt, currency, price_num = extract_price(title + " " + summary_txt)
+        image = find_image_from_entry(e) or fetch_og_image(link)
+        published = None
+        if "published_parsed" in e and e.published_parsed:
+            published = dt.datetime.fromtimestamp(time.mktime(e.published_parsed), tz=dt.timezone.utc)
+        elif "updated_parsed" in e and e.updated_parsed:
+            published = dt.datetime.fromtimestamp(time.mktime(e.updated_parsed), tz=dt.timezone.utc)
+        items.append({
+            "title": title,
+            "link": link,
+            "summary": summary_txt[:300],
+            "published": published,
+            "source": urllib.parse.urlsplit(url).netloc,
+            "image": image,
+            "price": price_txt,
+            "currency": currency,
+            "price_num": price_num
+        })
+    return items
 
-def human_time(ts):
-  if not ts: return "date inconnue"
-  offset = 2 if 3 <= dt.datetime.utcnow().month <= 10 else 1
-  tz = dt.timezone(dt.timedelta(hours=offset))
-  return ts.astimezone(tz).strftime("%Y-%m-%d %H:%M")
+def human_time(ts: dt.datetime) -> str:
+    if not ts: return "date inconnue"
+    month = dt.datetime.utcnow().month
+    offset = 2 if 3 <= month <= 10 else 1
+    tz = dt.timezone(dt.timedelta(hours=offset))
+    return ts.astimezone(tz).strftime("%Y-%m-%d %H:%M")
 
 def passes_filters(item, filters):
-  t = (item.get("title") or "") + " " + (item.get("summary") or "")
-  t_low = t.lower()
-  host = urllib.parse.urlsplit(item.get("link") or "").netloc.lower()
-  inc_kw = [k.lower() for k in (filters.get("include_keywords") or [])]
-  exc_kw = [k.lower() for k in (filters.get("exclude_keywords") or [])]
-  inc_dom = [d.lower() for d in (filters.get("include_domains") or [])]
-  exc_dom = [d.lower() for d in (filters.get("exclude_domains") or [])]
-  if inc_kw and not any(k in t_low for k in inc_kw): return False
-  if any(k in t_low for k in exc_kw): return False
-  if inc_dom and not any(d in host for d in inc_dom): return False
-  if any(d in host for d in exc_dom): return False
-  return True
+    t = (item.get("title") or "") + " " + (item.get("summary") or "")
+    t_low = t.lower()
+    host = urllib.parse.urlsplit(item.get("link") or "").netloc.lower()
+
+    inc_kw = [k.lower() for k in (filters.get("include_keywords") or [])]
+    exc_kw = [k.lower() for k in (filters.get("exclude_keywords") or [])]
+    inc_dom = [d.lower() for d in (filters.get("include_domains") or [])]
+    exc_dom = [d.lower() for d in (filters.get("exclude_domains") or [])]
+
+    if inc_kw and not any(k in t_low for k in inc_kw): return False
+    if any(k in t_low for k in exc_kw): return False
+    if inc_dom and not any(d in host for d in inc_dom): return False
+    if any(d in host for d in exc_dom): return False
+    return True
 
 def main():
-  cfg = load_yaml(ROOT / "feeds.yaml")
-  feeds = cfg.get("feeds", [])
-  rules = cfg.get("affiliate_rules", {})
-  site = cfg.get("site", {})
-  filters = cfg.get("filters", {})
-  limit = int(site.get("items_limit", 100))
+    cfg = load_yaml(ROOT / "feeds.yaml")
+    feeds = cfg.get("feeds", [])
+    rules = cfg.get("affiliate_rules", {})
+    site = cfg.get("site", {})
+    filters = cfg.get("filters", {})
+    limit = int(site.get("items_limit", 100))
 
-  all_items = []
-  for f in feeds:
-    url = f["url"] if isinstance(f, dict) else f
-    try:
-      items = parse_feed(url)
-      for it in items:
-        it["link"] = apply_affiliate(it["link"], rules)
-        it["norm"] = normalize_url(it["link"])
-        all_items.append(it)
-    except Exception as ex:
-      print(f"[warn] feed error {url}: {ex}")
+    all_items = []
+    for f in feeds:
+        url = f["url"] if isinstance(f, dict) else f
+        try:
+            items = parse_feed(url)
+            for it in items:
+                it["link"] = apply_affiliate(it["link"], rules)
+                it["norm"] = normalize_url(it["link"])
+                all_items.append(it)
+        except Exception as ex:
+            print(f"[warn] feed error {url}: {ex}")
 
-  filtered = [it for it in all_items if passes_filters(it, filters)]
-  seen, unique = set(), []
-  for it in sorted(filtered, key=lambda x: x.get("published") or dt.datetime(1970,1,1,tzinfo=dt.timezone.utc), reverse=True):
-    if it["norm"] in seen: continue
-    seen.add(it["norm"])
-    it["published_human"] = human_time(it.get("published"))
-    unique.append(it)
-    if len(unique) >= limit: break
+    filtered = [it for it in all_items if passes_filters(it, filters)]
+    seen, unique = set(), []
+    for it in sorted(filtered, key=lambda x: x.get("published") or dt.datetime(1970,1,1,tzinfo=dt.timezone.utc), reverse=True):
+        if it["norm"] in seen: continue
+        seen.add(it["norm"])
+        it["published_human"] = human_time(it.get("published"))
+        unique.append(it)
+        if len(unique) >= limit: break
 
-  env = Environment(loader=FileSystemLoader(str(ROOT)), autoescape=select_autoescape(["html"]))
-  tpl = env.get_template("template.html")
-  html = tpl.render(items=unique, site=site, now_human=human_time(dt.datetime.now(dt.timezone.utc)))
-  (DOCS / "index.html").write_text(html, encoding="utf-8")
-  (DOCS / "data.json").write_text(json.dumps(unique, default=str, ensure_ascii=False, indent=2), encoding="utf-8")
-  copy_assets()
-  print(f"[ok] {len(unique)} items -> docs/index.html")
+    env = Environment(loader=FileSystemLoader(str(ROOT)), autoescape=select_autoescape(["html"]))
+    tpl = env.get_template("template.html")
+    html = tpl.render(items=unique, site=site, now_human=human_time(dt.datetime.now(dt.timezone.utc)))
+    (DOCS / "index.html").write_text(html, encoding="utf-8")
+    (DOCS / "data.json").write_text(json.dumps(unique, default=str, ensure_ascii=False, indent=2), encoding="utf-8")
+    copy_assets()
+    print(f"[ok] {len(unique)} items -> docs/index.html")
 
 if __name__ == "__main__":
-  main()
+    main()
