@@ -6,7 +6,7 @@ feeds:
   - url: https://www.phonandroid.com/feed
 
 affiliate_rules:
-  "amazon.fr": "?tag=TONID-21"
+  "amazon.fr": "?tag=TONID-21"  # ← remplace TONID-21 par ton tag Amazon
   "amazon.de": "?tag=TONID-21"
   "amazon.es": "?tag=TONID-21"
   "amazon.it": "?tag=TONID-21"
@@ -17,10 +17,8 @@ filters:
 
 options:
   prefer_direct_merchant: true
-  prefer_direct_mode: "aggressive"
   strip_affiliate_params: true
-  aggregator_domains: ["dealabs.com","go.dealabs.com","frandroid.com","phonandroid.com","clubic.com"]
-  merchant_domains: ["amazon.","aliexpress.","cdiscount.","manomano.","ldlc.","boulanger.","fnac.","darty.","rakuten.","decathlon.","rueducommerce."]
+  merchant_domains: ["amazon.", "aliexpress.", "cdiscount.", "manomano.", "ldlc.", "boulanger.", "fnac.", "darty.", "rakuten.", "decathlon.", "rueducommerce.", "ikea.", "leroymerlin.", "castorama."]
   affiliate_params_to_strip: ["tag","ascsubtag","affid","aff","awc","utm_source","utm_medium","utm_campaign","utm_term","utm_content","amdata","_encoding","linkCode","camp","campid","cjevent","awinaffid","awinmid","fbclid","mc_eid","mc_cid"]
 
 site:

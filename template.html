@@ -7,33 +7,39 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#0b0f15;color:#e6edf3}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 4%}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+    .card{background:#131a26;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px}
+    .meta{color:#9fb1c3;font-size:12px;margin-bottom:6px;display:flex;gap:8px;align-items:center}
+    .title{color:#e6edf3;text-decoration:none}
+    .title:hover{text-decoration:underline}
+    .cta a{display:inline-block;margin-top:8px;background:#6be675;color:#07150a;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}
+    .src a{color:#9fb1c3}
+  </style>
 </head>
 <body>
-<header class="wrap header">
+<header class="wrap">
   <h1>PromoTronik</h1>
-  <p class="tagline">{{ site.description }}</p>
-  <p class="disc">{{ site.disclosure }}</p>
+  <p>{{ site.description }}</p>
+  <p style="color:#b7ffc2">{{ site.disclosure }}</p>
 </header>
 
 <main class="wrap grid">
 {% for it in items %}
   <article class="card">
     <div class="meta">
-      <span class="date">🕒 {{ it.published_human }}</span>
-      <span class="src">Source : <a href="{{ it.origin }}" rel="nofollow noopener"> {{ it.source }} </a></span>
+      <span>🕒 {{ it.published_human }}</span>
+      <span class="src">Source : <a href="{{ it.origin }}" rel="nofollow noopener">{{ it.source }}</a></span>
     </div>
     <h3><a class="title" href="{{ it.link }}" rel="nofollow sponsored noopener">{{ it.title }}</a></h3>
-    <p class="sum">{{ it.summary }}</p>
-    <div class="cta">
-      <a class="btn" href="{{ it.link }}" rel="nofollow sponsored noopener">Voir l’offre →</a>
-    </div>
+    <p>{{ it.summary }}</p>
+    <div class="cta"><a href="{{ it.link }}" rel="nofollow sponsored noopener">Voir l’offre →</a></div>
   </article>
 {% endfor %}
 </main>
 
-<footer class="wrap foot">
-  <small>MAJ : {{ now_human }} — © PromoTronik</small>
-</footer>
+<footer class="wrap"><small>MAJ : {{ now_human }} — © PromoTronik</small></footer>
 </body>
 </html>
