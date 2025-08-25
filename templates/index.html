@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ site.title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0f17;--panel:#0f1623;--ink:#e6edf3;--muted:#99a8b7;--brand:#6be675;--line:rgba(255,255,255,.08)}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:linear-gradient(180deg,#0a0f17,#0b1220 60%,#0a0f17);color:var(--ink);font:16px/1.5 'Inter',system-ui,sans-serif}
+.wrap{width:min(1200px,92%);margin:24px auto}
+header h1{font-weight:800;margin:8px 0 2px 0;font-size:32px}
+header p{margin:0 0 6px 0;color:var(--muted)}
+header .disclosure{color:#b7ffc2;margin-top:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:16px}
+.card{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+img.prod{width:100%;height:180px;object-fit:contain;background:rgba(255,255,255,.05);border-radius:10px}
+.title{font-weight:600;margin:0;color:var(--ink)}
+.merch{font-size:12px;color:var(--muted)}
+.price{display:flex;align-items:baseline;gap:8px}
+.price .now{font-weight:800;font-size:20px}
+.price .was{color:var(--muted);text-decoration:line-through}
+.badge{display:inline-block;background:var(--brand);color:#08230c;border-radius:999px;padding:2px 8px;font-weight:800;font-size:12px}
+.btn{display:inline-block;background:var(--brand);color:#06160a;font-weight:800;padding:10px 14px;border-radius:12px;text-decoration:none;text-align:center;border:1px solid rgba(0,0,0,.2)}
+.btn:hover{filter:brightness(1.04)}
+footer{color:var(--muted);text-align:center;margin:30px auto 44px}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>{{ site.title }}</h1>
+  <p>{{ site.description }}</p>
+  <p class="disclosure">{{ site.disclosure }}</p>
+</header>
+
+<main class="wrap grid">
+{% for it in items %}
+  <article class="card">
+    {% if it.image %}<img class="prod" src="{{ it.image }}" loading="lazy" alt="Illustration">{% endif %}
+    <h3 class="title">{{ it.title }}</h3>
+    <div class="merch">{{ it.merchant|capitalize }}{% if it.category %} • {{ it.category }}{% endif %}</div>
+    <div class="price">
+      {% if it.price %}<div class="now">{{ '%.2f'|format(it.price) }} {{ it.currency or '€' }}</div>{% endif %}
+      {% if it.old_price and it.discount_percent %}
+        <div class="was">{{ '%.2f'|format(it.old_price) }} {{ it.currency or '€' }}</div>
+        <span class="badge">-{{ it.discount_percent }}%</span>
+      {% endif %}
+    </div>
+    <a class="btn" href="{{ it.url }}" rel="nofollow sponsored noopener">Voir l’offre →</a>
+  </article>
+{% endfor %}
+</main>
+
+<footer class="wrap">
+  <small>{{ site.legal_note.format(updated_at=updated_at) }}</small>
+</footer>
+</body>
+</html>

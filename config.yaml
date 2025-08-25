@@ -1,0 +1,30 @@
+site:
+  title: "PromoTronik"
+  description: "Promos marchands (Amazon, Fnac, Darty, LDLC…) — liens directs"
+  disclosure: "Contient des liens affiliés. En tant que Partenaire Amazon, je réalise un bénéfice sur les achats remplissant les conditions requises."
+  legal_note: "Prix et disponibilité susceptibles d’être modifiés par les marchands. Dernière mise à jour : {updated_at}."
+  items_limit: 120
+
+amazon:
+  enabled: true
+  marketplace: "www.amazon.fr"
+  partner_tag: null
+  partner_type: "Associates"
+  queries:
+    - { keywords: "SSD NVMe", browse_node: null, sort_by: "SalesRank", min_savings_percent: 10 }
+    - { keywords: "Casque Bluetooth", browse_node: null, sort_by: "SalesRank", min_savings_percent: 10 }
+    - { keywords: "Perceuse", browse_node: null, sort_by: "SalesRank", min_savings_percent: 10 }
+
+awin:
+  enabled: true
+  feeds:
+    - { name: "fnac",   env: "AWIN_FEED_FNAC",   enabled: true }
+    - { name: "darty",  env: "AWIN_FEED_DARTY",  enabled: true }
+    - { name: "ldlc",   env: "AWIN_FEED_LDLC",   enabled: false }
+  min_discount_percent: 12
+  auth_header_env: "AWIN_AUTH_HEADER"
+
+ranking:
+  prefer_merchants: ["amazon", "fnac", "darty", "ldlc", "boulanger", "cdiscount", "manomano"]
+  weight_discount: 0.6
+  weight_recency_hours: 0.4
