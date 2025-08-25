@@ -22,6 +22,7 @@ options:
   aggregator_domains: ["dealabs.com","go.dealabs.com","frandroid.com","phonandroid.com","clubic.com"]
   merchant_domains: ["amazon.","aliexpress.","cdiscount.","manomano.","ldlc.","boulanger.","fnac.","darty.","rakuten.","decathlon.","rueducommerce."]
   affiliate_params_to_strip: ["tag","ascsubtag","affid","aff","awc","utm_source","utm_medium","utm_campaign","utm_term","utm_content","amdata","_encoding","linkCode","camp","campid","cjevent","awinaffid","awinmid","fbclid","mc_eid","mc_cid"]
+
 site:
   title: "PromoTronik"
   description: "Bons plans High‑Tech & DIY — liens directs marchands (affiliation)"
