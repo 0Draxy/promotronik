@@ -1,24 +1,32 @@
-# Configuration du site PromoTronik
-
 feeds:
   - url: https://www.dealabs.com/rss/hot
   - url: https://www.dealabs.com/rss/nouveaux
   - url: https://www.frandroid.com/bon-plans/feed
   - url: https://www.clubic.com/rss/
-  - url: https://www.phonandroid.com/feed
 
+# Règles d'affiliation (exemple). Remplace TONID-21 par ton tag Amazon.
 affiliate_rules:
-  "amazon.fr": "?tag=TONTAG-21"
-  "amazon.com": "?tag=YOURTAG-20"
-  "aliexpress.com": "?aff_fcid=TON_ID"
+  "amazon.fr": "?tag=TONID-21"
+  "amazon.es": "?tag=TONID-21"
+  "amazon.de": "?tag=TONID-21"
+  "amazon.it": "?tag=TONID-21"
+
+# Filtres (adapte si besoin)
+filters:
+  include_keywords: []
+  exclude_keywords: ["assurance", "crédit", "casino", "paris sportifs", "cigarette"]
+
+# Options "lien direct marchand"
+options:
+  prefer_direct_merchant: true
+  strip_affiliate_params: true
+  # Domaines d'agrégateurs à dérouler (tu peux en ajouter)
+  aggregator_domains: ["dealabs.com", "go.dealabs.com"]
+  # Paramètres d'affiliation à supprimer AVANT d'ajouter les tiens
+  affiliate_params_to_strip: ["tag","ascsubtag","affid","aff","awc","utm_source","utm_medium","utm_campaign","amdata","_encoding","linkCode"]
 
 site:
   title: "PromoTronik"
-  description: "Sélection auto-mise à jour de promos et bons plans high-tech & DIY"
+  description: "Bons plans High‑Tech & DIY — liens directs marchands (affiliation)"
   disclosure: "Contient des liens affiliés. En tant que Partenaire Amazon, je réalise un bénéfice sur les achats remplissant les conditions requises."
   items_limit: 100
-
-# Filtres pour inclure ou exclure des mots-clés (tout en minuscules)
-filters:
-  include_keywords: []   # ex: ["perceuse", "arduino"]
-  exclude_keywords: []   # ex: ["réfrigérateur", "voiture"]
