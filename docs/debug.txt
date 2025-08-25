@@ -1,0 +1,5 @@
+[amazon] env present: {'AMAZON_ACCESS_KEY': False, 'AMAZON_SECRET_KEY': False, 'AMAZON_PARTNER_TAG': False}
+[amazon] collected: 0 items
+[awin] disabled in config.yaml
+[collect] total before dedupe: 0
+[collect] after dedupe: 0

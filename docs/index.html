@@ -4,44 +4,41 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PromoTronik</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0f17;--panel:#0f1623;--ink:#e6edf3;--muted:#99a8b7;--brand:#6be675;--line:rgba(255,255,255,.08)}
-*{box-sizing:border-box}html,body{margin:0;padding:0}
-body{background:linear-gradient(180deg,#0a0f17,#0b1220 60%,#0a0f17);color:var(--ink);font:16px/1.5 'Inter',system-ui,sans-serif}
-.wrap{width:min(1200px,92%);margin:24px auto}
-header h1{font-weight:800;margin:8px 0 2px 0;font-size:32px}
-header p{margin:0 0 6px 0;color:var(--muted)}
-header .disclosure{color:#b7ffc2;margin-top:6px}
+body{font:16px/1.5 system-ui,sans-serif;background:#0b0f15;color:#e6edf3;margin:0}
+.wrap{max-width:1100px;margin:24px auto;padding:0 4%}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:16px}
-.card{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
-img.prod{width:100%;height:180px;object-fit:contain;background:rgba(255,255,255,.05);border-radius:10px}
-.title{font-weight:600;margin:0;color:var(--ink)}
-.merch{font-size:12px;color:var(--muted)}
-.price{display:flex;align-items:baseline;gap:8px}
-.price .now{font-weight:800;font-size:20px}
-.price .was{color:var(--muted);text-decoration:line-through}
-.badge{display:inline-block;background:var(--brand);color:#08230c;border-radius:999px;padding:2px 8px;font-weight:800;font-size:12px}
-.btn{display:inline-block;background:var(--brand);color:var(--bg);font-weight:800;padding:10px 14px;border-radius:12px;text-decoration:none;text-align:center;border:1px solid rgba(0,0,0,.2)}
-.btn:hover{filter:brightness(1.04)}
-footer{color:var(--muted);text-align:center;margin:30px auto 44px}
+.card{background:#121a26;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
+.empty{background:#101826;border:1px dashed rgba(255,255,255,.2);padding:18px;border-radius:12px}
+.empty h3{margin:0 0 6px 0}
+kbd{background:#0d1320;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:2px 6px}
+a{color:#8ad1ff}
 </style>
 </head>
 <body>
 <header class="wrap">
   <h1>PromoTronik</h1>
   <p>Promos marchands (Amazon, Fnac, Darty, LDLC…) — liens directs</p>
-  <p class="disclosure">Contient des liens affiliés. En tant que Partenaire Amazon, je réalise un bénéfice sur les achats remplissant les conditions requises.</p>
+  <p style="color:#b7ffc2">Contient des liens affiliés. En tant que Partenaire Amazon, je réalise un bénéfice sur les achats remplissant les conditions requises.</p>
 </header>
 
-<main class="wrap grid">
+<main class="wrap">
 
+  <div class="empty">
+    <h3>🛠️ Rien à afficher pour le moment</h3>
+    <ol>
+      <li>Vérifie que les secrets <kbd>AMAZON_ACCESS_KEY</kbd>, <kbd>AMAZON_SECRET_KEY</kbd> et <kbd>AMAZON_PARTNER_TAG</kbd> existent (Settings → Secrets → Actions).</li>
+      <li>Si tu n’as pas encore accès PA‑API (compte pas activé), mets <kbd>amazon.enabled: false</kbd> dans <code>config.yaml</code> ou active des feeds AWIN (Fnac/Darty).</li>
+      <li>Ouvre le fichier <strong>docs/debug.txt</strong> dans le dépôt pour le détail de la collecte.</li>
+    </ol>
+  </div>
+
+
+  <section class="grid">
+  
+  </section>
 </main>
 
-<footer class="wrap">
-  <small>Prix et disponibilité susceptibles d’être modifiés par les marchands. Dernière mise à jour : 2025-08-25T16:45:53.005683+00:00.</small>
-</footer>
+<footer class="wrap"><small>Prix et disponibilité susceptibles d’être modifiés par les marchands. Dernière mise à jour : 2025-08-25T17:22:47.278921+00:00.</small></footer>
 </body>
 </html>
