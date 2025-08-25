@@ -5,109 +5,70 @@
   <title>{{ site.title }}</title>
   <meta name="description" content="{{ site.description }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background-color: #f5f7fa;
-      color: #333;
-      margin: 0;
-      padding: 0;
-    }
-    .header {
-      background-color: #ffffff;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      padding: 40px 20px;
-      text-align: center;
-    }
-    .header h1 {
-      margin: 0 0 6px;
-      font-size: 2.2em;
-      color: #0057b8;
-    }
-    .header p {
-      margin: 4px 0;
-      font-size: 1em;
-    }
-    .disc {
-      background-color: #fffbeb;
-      border-left: 4px solid #ffeb3b;
-      padding: 10px 16px;
-      margin-top: 12px;
-      margin-bottom: 0;
-      display: inline-block;
-      font-size: 0.85em;
-      color: #555;
-    }
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 24px 16px;
-    }
-    .item-card {
-      background-color: #fff;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      padding: 16px 20px;
-      margin-bottom: 20px;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .item-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 6px rgba(0,0,0,0.15);
-    }
-    .item-card h3 {
-      margin: 0 0 8px;
-      font-size: 1.2em;
-    }
-    .item-card h3 a {
-      color: #0057b8;
-      text-decoration: none;
-    }
-    .item-card h3 a:hover {
-      text-decoration: underline;
-    }
-    .meta {
-      font-size: 0.85em;
-      color: #666;
-    }
-    .meta .time {
-      margin-right: 8px;
-    }
-    footer {
-      text-align: center;
-      padding: 20px;
-      font-size: 0.8em;
-      color: #888;
-    }
-    footer a {
-      color: #0057b8;
-      text-decoration: none;
-    }
-    footer a:hover {
-      text-decoration: underline;
-    }
-  </style>
+  <link rel="stylesheet" href="./assets/styles.css">
 </head>
 <body>
-  <div class="header">
-    <h1>{{ site.title }}</h1>
-    <p>{{ site.description }}</p>
-    <p class="disc">{{ site.disclosure }}</p>
-  </div>
-  <div class="container">
-    {% for it in items %}
-      <div class="item-card">
-        <h3><a href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">{{ it.title }}</a></h3>
-        {% if it.summary %}<div class="meta">{{ it.summary }}</div>{% endif %}
-        <div class="meta">
-          <span class="time">🕒 {{ it.published_human }}</span>
-          {% if it.source %} • <span>Source : {{ it.source }}</span>{% endif %}
+  <header class="hero">
+    <div class="wrap">
+      <div class="brand">
+        <img src="./assets/logo.svg" alt="PromoTronik" width="36" height="36" />
+        <div class="brand-txt">
+          <h1>{{ site.title }}</h1>
+          <p class="tagline">{{ site.description }}</p>
         </div>
       </div>
-    {% endfor %}
-  </div>
-  <footer>
-    Mis à jour automatiquement — {{ now_human }}. <a href="./mentions.html">Mentions</a>
+      <div class="controls">
+        <div class="search">
+          <input id="q" type="search" placeholder="Rechercher une offre (ex: SSD, perceuse, UGREEN)">
+          <button id="clear" title="Effacer">×</button>
+        </div>
+        <div class="selects">
+          <select id="sort">
+            <option value="new">Plus récentes</option>
+            <option value="az">A → Z</option>
+          </select>
+          <button class="mode" id="modeToggle" aria-label="Basculer thème">🌙</button>
+        </div>
+      </div>
+      <div class="disclosure">{{ site.disclosure }}</div>
+    </div>
+  </header>
+  <main class="wrap">
+    <div id="chips" class="chips">
+      <button data-k="ssd">SSD</button>
+      <button data-k="perceuse">Bricolage</button>
+      <button data-k="raspberry">Raspberry/Arduino</button>
+      <button data-k="ugreen">UGREEN</button>
+      <button data-k="camping">Camping/outdoor</button>
+      <button data-k="sport">Sport</button>
+      <button data-k="">Tout</button>
+    </div>
+    <!-- SSR fallback if JS disabled -->
+    <div id="cards" class="cards">
+      {% for it in items %}
+        <article class="card">
+          <div class="card-body">
+            <div class="card-title">
+              <img class="favicon" src="https://www.google.com/s2/favicons?domain={{ it.source }}&sz=32" alt="" width="16" height="16">
+              <h3><a href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">{{ it.title }}</a></h3>
+            </div>
+            {% if it.summary %}<p class="summary">{{ it.summary }}</p>{% endif %}
+            <div class="meta">
+              <span class="time">🕒 {{ it.published_human }}</span>
+              {% if it.source %}<span class="dot">•</span><span class="src">{{ it.source }}</span>{% endif %}
+              <a class="cta" href="{{ it.link }}" rel="nofollow sponsored noopener" target="_blank">Voir l’offre →</a>
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </main>
+  <footer class="foot">
+    <div class="wrap">
+      <p>Mis à jour automatiquement — {{ now_human }} • <a href="./data.json">Flux JSON</a> • <a href="./mentions.html">Mentions</a></p>
+    </div>
   </footer>
+  <script>window.__PROMO__NOW="{{ now_human }}";</script>
+  <script src="./assets/app.js" defer></script>
 </body>
 </html>
