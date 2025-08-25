@@ -1,0 +1,16 @@
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+:root{--bg:#0b0f15;--panel:#121824;--ink:#e6edf3;--muted:#9fb1c3;--acc:#6be675;--btn:#1f2937}
+body{background:linear-gradient(180deg,#0b0f15,#0d1220 50%,#0b0f15);color:var(--ink);font:16px/1.5 'Inter',system-ui,sans-serif}
+.wrap{width:min(1100px,92%);margin:24px auto}
+.header h1{font-size:32px;margin:8px 0 4px 0;font-weight:800}
+.header .tagline{margin:0 0 6px 0;color:var(--muted)}
+.header .disc{margin:0;color:#b7ffc2}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;margin-top:10px}
+.card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;backdrop-filter:blur(4px);box-shadow:0 6px 16px rgba(0,0,0,.25)}
+.card .meta{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12px;margin-bottom:6px}
+.card .title{color:var(--ink);text-decoration:none}
+.card .title:hover{text-decoration:underline}
+.card .sum{color:var(--ink);opacity:.9;margin:8px 0 14px 0;min-height:66px}
+.btn{display:inline-block;background:var(--acc);color:#02120a;font-weight:700;padding:10px 14px;border-radius:10px;text-decoration:none;border:1px solid rgba(0,0,0,.2)}
+.btn:hover{filter:brightness(1.04)}
+.foot{color:var(--muted);text-align:center;margin:30px auto 40px}
