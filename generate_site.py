@@ -53,15 +53,21 @@ def is_merchant_host(host: str, merchant_domains: list[str]) -> bool:
 AFFILIATE_HOST_HINTS = ("awin1.com","s.click.aliexpress.com","linksynergy.com","partnerize","impact.com","go.dealabs.com")
 META_REFRESH_RE = re.compile(r'url=(.+)', re.I)
 
+def _clean_meta_url(text: str) -> str:
+    text = text.strip()
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        return text[1:-1].strip()
+    return re.sub(r'^\s*['"]?(.*?)['"]?\s*$', r'\1', text)
+
 def follow_chain(url: str, max_hops=10) -> str:
-    # Resolve redirects via GET (allow_redirects=True) to reach final URL.
     try:
         s = requests.Session()
         r = s.get(url, headers=HEADERS, allow_redirects=True, timeout=10)
         if "text/html" in (r.headers.get("Content-Type") or "") and r.text:
             m = META_REFRESH_RE.search(r.text)
             if m:
-                nxt = urllib.parse.urljoin(r.url, m.group(1).strip(" '\\""))
+                raw = _clean_meta_url(m.group(1))
+                nxt = urllib.parse.urljoin(r.url, raw)
                 r2 = s.get(nxt, headers=HEADERS, allow_redirects=True, timeout=10)
                 return r2.url
         return r.url
